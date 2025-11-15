@@ -9,8 +9,12 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 ACTUAL_CAPTURE_FIELD = "FETCHED_AT_UTC"
 
 
+ACTUAL_SETTLEMENT_FIELD = "SETTLEMENTDATE_UTC"
+ACTUAL_CAPTURE_FIELD = "FETCHED_AT_UTC"
+
+
 ACTUAL_COLUMNS = [
-    "SETTLEMENTDATE",
+    ACTUAL_SETTLEMENT_FIELD,
     "REGIONID",
     "RRP",
     "TOTALDEMAND",
@@ -35,11 +39,30 @@ def _parse_settlement(value: str) -> dt.datetime:
     if value.endswith("Z"):
         value = value.replace("Z", "+00:00")
     parsed = dt.datetime.fromisoformat(value)
-    return parsed.replace(tzinfo=None) if parsed.tzinfo else parsed
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.timezone.utc)
+    else:
+        parsed = parsed.astimezone(dt.timezone.utc)
+    return parsed
+
+
+def _format_utc(ts: dt.datetime) -> str:
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=dt.timezone.utc)
+    else:
+        ts = ts.astimezone(dt.timezone.utc)
+    return ts.isoformat()
 
 
 def _normalize_actual_row(raw: Dict[str, Any]) -> Dict[str, Any]:
-    return {field: raw.get(field, "") for field in ACTUAL_COLUMNS}
+    result = {field: raw.get(field, "") for field in ACTUAL_COLUMNS if field not in {ACTUAL_SETTLEMENT_FIELD, ACTUAL_CAPTURE_FIELD}}
+    settlement_raw = raw.get("SETTLEMENTDATE")
+    if settlement_raw:
+        result[ACTUAL_SETTLEMENT_FIELD] = _format_utc(_parse_settlement(settlement_raw))
+    else:
+        result[ACTUAL_SETTLEMENT_FIELD] = ""
+    result[ACTUAL_CAPTURE_FIELD] = ""
+    return result
 
 
 def _build_forecast_rows(
@@ -51,15 +74,13 @@ def _build_forecast_rows(
         return None, None
 
     capture_time_utc = capture_time.astimezone(dt.timezone.utc)
-    capture_time_naive = capture_time_utc.replace(tzinfo=None)
-
     sorted_rows = sorted(rows, key=lambda row: _parse_settlement(row["SETTLEMENTDATE"]))
     timestamps = [_parse_settlement(row["SETTLEMENTDATE"]) for row in sorted_rows]
-    base_dt = next((ts for ts in timestamps if ts >= capture_time_naive), timestamps[0])
+    base_dt = next((ts for ts in timestamps if ts >= capture_time_utc), timestamps[0])
 
     price_row = {
-        "capture_time_utc": capture_time_utc.isoformat().replace("+00:00", "Z"),
-        "base_settlementdate": base_dt.isoformat(),
+        "capture_time_utc": capture_time_utc.isoformat(),
+        "base_settlementdate_utc": base_dt.isoformat(),
     }
     demand_row = dict(price_row)
     for row, ts in zip(sorted_rows, timestamps):
@@ -96,9 +117,9 @@ def build_region_snapshots(
     for region, buckets in per_region.items():
         actual_rows = sorted(
             (_normalize_actual_row(row) for row in buckets["ACTUAL"]),
-            key=lambda row: row["SETTLEMENTDATE"],
+            key=lambda row: row[ACTUAL_SETTLEMENT_FIELD],
         )
-        fetch_ts = capture_time.isoformat()
+        fetch_ts = _format_utc(capture_time)
         for row in actual_rows:
             row[ACTUAL_CAPTURE_FIELD] = fetch_ts
         price_row, demand_row = _build_forecast_rows(buckets["FORECAST"], capture_time)
