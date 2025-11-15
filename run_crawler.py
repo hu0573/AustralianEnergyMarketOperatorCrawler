@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import sys
 import time
 from pathlib import Path
-
-import sys
 
 REPO_ROOT = Path(__file__).resolve().parent
 SRC_DIR = REPO_ROOT / "aemo_crawler" / "src"
@@ -44,18 +43,20 @@ def main() -> None:
     data_dir = args.data_dir.expanduser().resolve()
     interval = max(1, args.interval)
 
+    def fmt_now() -> str:
+        return dt.datetime.now().astimezone().isoformat()
+
     print("🚀 AEMO 5MIN 连续抓取启动，按 Ctrl+C 终止。")
     print(f"   输出目录: {data_dir}")
     print(f"   抓取间隔: {interval} 秒")
 
     try:
         while True:
-            start = dt.datetime.now(dt.timezone.utc)
-            print(f"\n[{start.isoformat()}] 开始抓取……")
+            print(f"\n[{fmt_now()}] 开始抓取……")
             summary = run_once(data_dir, time_scale=args.time_scale)
             for line in summary:
                 print(f"  • {line}")
-            print(f"[{dt.datetime.now(dt.timezone.utc).isoformat()}] 本次抓取完成。")
+            print(f"[{fmt_now()}] 本次抓取完成。")
             time.sleep(interval)
     except KeyboardInterrupt:
         print("\n🛑 已收到中断信号，停止抓取。")
