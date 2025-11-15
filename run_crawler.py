@@ -43,8 +43,8 @@ def main() -> None:
     data_dir = args.data_dir.expanduser().resolve()
     interval = max(1, args.interval)
 
-    def fmt_now() -> str:
-        return dt.datetime.now().astimezone().isoformat()
+    def utc_now() -> str:
+        return dt.datetime.now(dt.timezone.utc).isoformat()
 
     print("🚀 AEMO 5MIN 连续抓取启动，按 Ctrl+C 终止。")
     print(f"   输出目录: {data_dir}")
@@ -52,11 +52,11 @@ def main() -> None:
 
     try:
         while True:
-            print(f"\n[{fmt_now()}] 开始抓取……")
+            print(f"\n[fetched_at_utc={utc_now()}] 开始抓取……")
             summary = run_once(data_dir, time_scale=args.time_scale)
             for line in summary:
                 print(f"  • {line}")
-            print(f"[{fmt_now()}] 本次抓取完成。")
+            print(f"[fetched_at_utc={utc_now()}] 本次抓取完成。")
             time.sleep(interval)
     except KeyboardInterrupt:
         print("\n🛑 已收到中断信号，停止抓取。")

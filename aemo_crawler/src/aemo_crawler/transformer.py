@@ -6,6 +6,9 @@ from dataclasses import dataclass
 import datetime as dt
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+ACTUAL_CAPTURE_FIELD = "FETCHED_AT_UTC"
+
+
 ACTUAL_COLUMNS = [
     "SETTLEMENTDATE",
     "REGIONID",
@@ -16,6 +19,7 @@ ACTUAL_COLUMNS = [
     "SEMISCHEDULEDGENERATION",
     "APCFLAG",
     "PERIODTYPE",
+    ACTUAL_CAPTURE_FIELD,
 ]
 
 
@@ -94,6 +98,9 @@ def build_region_snapshots(
             (_normalize_actual_row(row) for row in buckets["ACTUAL"]),
             key=lambda row: row["SETTLEMENTDATE"],
         )
+        fetch_ts = capture_time.isoformat()
+        for row in actual_rows:
+            row[ACTUAL_CAPTURE_FIELD] = fetch_ts
         price_row, demand_row = _build_forecast_rows(buckets["FORECAST"], capture_time)
         snapshots[region] = RegionSnapshot(
             region=region,

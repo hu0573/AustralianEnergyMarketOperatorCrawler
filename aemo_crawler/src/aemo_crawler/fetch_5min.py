@@ -31,7 +31,9 @@ def summarize(records: List[Dict[str, Any]]) -> str:
         msg.append(f"首条记录: region={first.get('REGIONID')} RRP={price:.2f} TOTALDEMAND={demand:.1f}")
     except (KeyError, TypeError, ValueError):
         pass
-    msg.append(f"抓取时间: {dt.datetime.now().astimezone().isoformat()}")
+    msg.append(
+        f"抓取时间(fetched_at_utc): {dt.datetime.now(dt.timezone.utc).isoformat()}"
+    )
     return "\n".join(msg)
 
 
